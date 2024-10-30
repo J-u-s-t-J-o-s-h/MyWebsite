@@ -1,12 +1,10 @@
 import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import BackgroundScene from './BackgroundScene';
 
 const Dashboard = () => {
   const { currentUser } = useAuth();
-  const navigate = useNavigate();
 
   // Animation variants
   const containerVariants = {

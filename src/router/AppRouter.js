@@ -6,6 +6,7 @@ import Login from '../components/auth/Login';
 import SignUp from '../components/auth/SignUp';
 import Dashboard from '../components/Dashboard';
 import ProtectedRoute from '../components/ProtectedRoute';
+import PortfolioSection from '../components/PortfolioSection';
 
 export default function AppRouter() {
   return (
@@ -21,6 +22,16 @@ export default function AppRouter() {
               <ProtectedRoute>
                 <Layout>
                   <Dashboard />
+                </Layout>
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/portfolio" 
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <PortfolioSection />
                 </Layout>
               </ProtectedRoute>
             } 

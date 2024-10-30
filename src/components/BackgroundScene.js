@@ -1,10 +1,8 @@
 import React, { useRef, useEffect } from 'react';
 import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 
 const BackgroundScene = () => {
   const containerRef = useRef();
-  const mousePosition = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
     const container = containerRef.current;
@@ -12,92 +10,94 @@ const BackgroundScene = () => {
     // Scene setup
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    const renderer = new THREE.WebGLRenderer({ 
+      antialias: true,
+      alpha: true,
+      powerPreference: "high-performance"
+    });
     
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setClearColor(0x0a0a0a, 1);
+    renderer.setClearColor(0x000000, 0);
     container.appendChild(renderer.domElement);
 
-    // Add ambient light
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-    scene.add(ambientLight);
+    // Create gradient background
+    const gradientGeometry = new THREE.PlaneGeometry(50, 50, 50, 50);
+    const gradientMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        time: { value: 0 },
+        resolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) }
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform float time;
+        uniform vec2 resolution;
+        varying vec2 vUv;
 
-    // Add directional light
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-    directionalLight.position.set(2, 2, 5);
-    scene.add(directionalLight);
+        void main() {
+          vec3 color1 = vec3(0.1, 0.1, 0.2); // Dark blue
+          vec3 color2 = vec3(0.2, 0.1, 0.3); // Purple
+          vec3 color3 = vec3(0.1, 0.2, 0.3); // Teal
+          
+          float noise = sin(vUv.x * 10.0 + time) * sin(vUv.y * 10.0 + time) * 0.5 + 0.5;
+          float pattern = sin(vUv.x * 8.0 + time * 0.5) * sin(vUv.y * 8.0 + time * 0.5);
+          
+          vec3 finalColor = mix(
+            mix(color1, color2, noise),
+            color3,
+            pattern
+          );
+          
+          gl_FragColor = vec4(finalColor, 1.0);
+        }
+      `,
+      transparent: true
+    });
 
-    // Create floating shapes
-    const shapes = [];
-    const geometries = [
-      new THREE.IcosahedronGeometry(1, 0),
-      new THREE.OctahedronGeometry(1, 0),
-      new THREE.TetrahedronGeometry(1, 0),
-    ];
+    const gradientMesh = new THREE.Mesh(gradientGeometry, gradientMaterial);
+    gradientMesh.position.z = -5;
+    scene.add(gradientMesh);
 
-    for (let i = 0; i < 50; i++) {
-      const geometry = geometries[Math.floor(Math.random() * geometries.length)];
-      const material = new THREE.MeshPhongMaterial({
-        color: new THREE.Color(`hsl(${Math.random() * 360}, 50%, 50%)`),
-        transparent: true,
-        opacity: 0.7,
-        wireframe: Math.random() > 0.5,
-      });
+    // Add floating particles
+    const particlesGeometry = new THREE.BufferGeometry();
+    const particlesCount = 1000; // Reduced count for subtlety
+    const positions = new Float32Array(particlesCount * 3);
+    const colors = new Float32Array(particlesCount * 3);
 
-      const mesh = new THREE.Mesh(geometry, material);
-      
-      // Random position
-      mesh.position.set(
-        (Math.random() - 0.5) * 20,
-        (Math.random() - 0.5) * 20,
-        (Math.random() - 0.5) * 20
-      );
-      
-      // Random rotation
-      mesh.rotation.set(
-        Math.random() * Math.PI,
-        Math.random() * Math.PI,
-        Math.random() * Math.PI
-      );
+    for(let i = 0; i < particlesCount * 3; i += 3) {
+      positions[i] = (Math.random() - 0.5) * 20;
+      positions[i + 1] = (Math.random() - 0.5) * 20;
+      positions[i + 2] = (Math.random() - 0.5) * 20;
 
-      // Random scale
-      const scale = 0.1 + Math.random() * 0.3;
-      mesh.scale.set(scale, scale, scale);
-
-      // Add animation properties
-      mesh.userData.rotationSpeed = {
-        x: (Math.random() - 0.5) * 0.02,
-        y: (Math.random() - 0.5) * 0.02,
-        z: (Math.random() - 0.5) * 0.02
-      };
-
-      mesh.userData.floatSpeed = 0.01 + Math.random() * 0.02;
-      mesh.userData.floatOffset = Math.random() * Math.PI * 2;
-
-      shapes.push(mesh);
-      scene.add(mesh);
+      // More subtle colors
+      const color = new THREE.Color();
+      color.setHSL(Math.random(), 0.3, 0.3); // Reduced saturation and lightness
+      colors[i] = color.r;
+      colors[i + 1] = color.g;
+      colors[i + 2] = color.b;
     }
 
+    particlesGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    particlesGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+    const particlesMaterial = new THREE.PointsMaterial({
+      size: 0.03, // Smaller particles
+      vertexColors: true,
+      blending: THREE.AdditiveBlending,
+      transparent: true,
+      opacity: 0.4 // More subtle
+    });
+
+    const particles = new THREE.Points(particlesGeometry, particlesMaterial);
+    scene.add(particles);
+
     // Camera position
-    camera.position.z = 10;
-
-    // Add controls
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.05;
-    controls.enableZoom = false;
-    controls.autoRotate = true;
-    controls.autoRotateSpeed = 0.5;
-
-    // Mouse movement handler
-    const onMouseMove = (event) => {
-      mousePosition.current = {
-        x: (event.clientX / window.innerWidth) * 2 - 1,
-        y: -(event.clientY / window.innerHeight) * 2 + 1,
-      };
-    };
-
-    window.addEventListener('mousemove', onMouseMove);
+    camera.position.z = 5;
 
     // Animation
     const clock = new THREE.Clock();
@@ -105,19 +105,19 @@ const BackgroundScene = () => {
     const animate = () => {
       const elapsedTime = clock.getElapsedTime();
 
-      // Animate shapes
-      shapes.forEach((shape) => {
-        // Rotation
-        shape.rotation.x += shape.userData.rotationSpeed.x;
-        shape.rotation.y += shape.userData.rotationSpeed.y;
-        shape.rotation.z += shape.userData.rotationSpeed.z;
+      // Update shader uniforms
+      gradientMaterial.uniforms.time.value = elapsedTime * 0.2; // Slower animation
 
-        // Floating motion
-        shape.position.y += Math.sin(elapsedTime * shape.userData.floatSpeed + 
-                                   shape.userData.floatOffset) * 0.002;
-      });
+      // Animate particles
+      particles.rotation.y = elapsedTime * 0.03; // Slower rotation
+      particles.rotation.x = elapsedTime * 0.02;
 
-      controls.update();
+      const positions = particles.geometry.attributes.position.array;
+      for(let i = 0; i < positions.length; i += 3) {
+        positions[i + 1] += Math.sin(elapsedTime + positions[i]) * 0.0005; // More subtle movement
+      }
+      particles.geometry.attributes.position.needsUpdate = true;
+
       renderer.render(scene, camera);
       requestAnimationFrame(animate);
     };
@@ -129,12 +129,12 @@ const BackgroundScene = () => {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
+      gradientMaterial.uniforms.resolution.value.set(window.innerWidth, window.innerHeight);
     };
 
     window.addEventListener('resize', handleResize);
 
     return () => {
-      window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('resize', handleResize);
       if (container) {
         container.removeChild(renderer.domElement);
@@ -147,8 +147,7 @@ const BackgroundScene = () => {
       ref={containerRef} 
       className="fixed inset-0 z-0"
       style={{ 
-        background: 'linear-gradient(to bottom right, #1a1a2e, #16213e, #1a1a2e)',
-        opacity: 0.9
+        background: 'linear-gradient(to bottom right, #0f172a, #1e1b4b)',
       }}
     />
   );
